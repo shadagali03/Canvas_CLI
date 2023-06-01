@@ -1,3 +1,5 @@
+use dotenv::dotenv;
+use reqwest::header::{HeaderMap, AUTHORIZATION};
 /*
 Plan for building the Canvas CLI
 
@@ -19,18 +21,16 @@ Plan for building the Canvas CLI
 - Submit the files to the course
     - COMMAND: canva submit <course_id> <file/files>
     - this will submit the file/files to the course as well as add a comment
-
  */
-use std::collections::HashMap;
-// use std::env;
+
+/*
+function: login
+Description: This function will allow the user to login to their canvas account
+Parameters: auth_token
+Return: Result<(), Box<dyn Error>>
+ */
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let args: Vec<String> = env::args().collect();
-    let resp = reqwest::get("https://httpbin.org/ip")
-        .await?
-        .json::<HashMap<String, String>>()
-        .await?;
-    println!("{:#?}", resp);
+pub async fn login(auth_token: String) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
