@@ -33,6 +33,27 @@ Parameters: auth_token
 Return: Result<(), Box<dyn Error>>
  */
 
+pub struct Config {
+    pub auth_token: Option<String>,
+    pub command: Option<String>,
+    pub course_id: Option<String>,
+}
+
+impl Config {
+    pub fn build(args: &[String]) -> Result<Config, &'static str> {
+        if args.len() < 2 {
+            return Err("not enough arguments");
+        }
+        let command = args[1].clone();
+        let auth_token = std::env::var("CANVAS_AUTH_TOKEN").ok();
+        let course_id = args.get(2).cloned();
+        Ok(Config {
+            auth_token,
+            command: Some(command),
+            course_id,
+        })
+    }
+}
 #[tokio::main]
 pub async fn account_info(auth_token: &String) -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
