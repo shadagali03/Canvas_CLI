@@ -1,6 +1,6 @@
 mod data;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
-use std::error::Error;
+use std::env;
 use std::fs::File;
 use std::io::Write;
 
@@ -30,9 +30,8 @@ Plan for building the Canvas CLI
 // For now I can start with using manual token generation, however, I will need to use OATH2 to get the token
 
 pub struct Config {
-    pub auth_token: Option<String>,
     pub command: Option<String>,
-    pub course_id: Option<String>,
+    pub arguments: Vec<String>,
 }
 
 impl Config {
@@ -42,35 +41,52 @@ impl Config {
         }
         let _help_message = "usage: canva [-h | --help]\n <command> [<args>]\n\n";
         let command = args[1].clone();
-        let auth_token: Option<String>;
-        if let Some(token) = args.get(2) {
-            auth_token = Some(token.clone());
-        } else {
-            auth_token = std::env::var("CANVAS_AUTH_TOKEN").ok();
-        }
-        let course_id = args.get(3).cloned();
+        // if let Some(token) = args.get(2) {
+        //     auth_token = Some(token.clone());
+        // } else {
+        //     auth_token = std::env::var("CANVAS_AUTH_TOKEN").ok();
+        // }
+        // let course_id = args.get(3).cloned();
         Ok(Config {
-            auth_token,
             command: Some(command),
-            course_id,
+            arguments: args[2..].to_vec(),
         })
     }
 }
 
-pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+pub fn run(config: Config) -> Result<(), &'static str> {
     match config.command {
         Some(command) => match command.as_str() {
             "account" => {
-                let auth_token = config.auth_token.unwrap();
-                account_info(&auth_token)?;
+                if config.arguments.len() == 0 {
+                    let auth_token = env::var("CANVAS_AUTH_TOKEN").expect("AUTH_TOKEN not set");
+                    account_info(&auth_token).expect("Error getting account info");
+                } else {
+                    return Err("Too many arguments");
+                }
             }
             "courses" => {
-                let auth_token = config.auth_token.unwrap();
-                get_courses(&auth_token)?;
+                if config.arguments.len() == 0 {
+                    let auth_token = env::var("CANVAS_AUTH_TOKEN").expect("AUTH_TOKEN not set");
+                    get_courses(&auth_token).expect("Error getting courses");
+                } else {
+                    return Err("Too many arguments");
+                }
             }
             "login" => {
-                let auth_token = config.auth_token.unwrap();
-                login(&auth_token)?;
+                let auth_token;
+                let school: String;
+                if let Some(token) = config.arguments.get(0) {
+                    auth_token = token.clone();
+                } else {
+                    return Err("No auth token provided");
+                }
+                if let Some(school_name) = config.arguments.get(1) {
+                    school = school_name.clone();
+                } else {
+                    return Err("No school name provided");
+                }
+                login(&auth_token, &school).expect("Error logging in");
             }
             _ => println!("Command not found"),
         },
@@ -87,13 +103,14 @@ Return: Result<(), Box<dyn Error>>
  */
 #[tokio::main]
 pub async fn account_info(auth_token: &String) -> Result<(), Box<dyn std::error::Error>> {
+    let api_path = format!("{}/api/v1/users/self", env::var("SCHOOL_BASE_URL").unwrap());
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
         format!("Bearer {}", auth_token).parse().unwrap(),
     );
     let resp = reqwest::Client::new()
-        .get("https://sit.instructure.com/api/v1/users/self")
+        .get(api_path.as_str())
         .headers(headers)
         .send()
         .await?;
@@ -105,19 +122,20 @@ pub async fn account_info(auth_token: &String) -> Result<(), Box<dyn std::error:
 
 /*
 function: courses
-Description: This function will allow the user to login to their canvas account
+Description: This function will allow the user to see what courses they are enrolled in
 Parameters: auth_token -> but not actually required by user
 Return: Result<(), Box<dyn Error>>
  */
 #[tokio::main]
 pub async fn get_courses(auth_token: &String) -> Result<(), Box<dyn std::error::Error>> {
+    let api_path = format!("{}/api/v1/courses", env::var("SCHOOL_BASE_URL").unwrap());
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
         format!("Bearer {}", auth_token).parse().unwrap(),
     );
     let resp = reqwest::Client::new()
-        .get("https://sit.instructure.com/api/v1/courses")
+        .get(api_path.as_str())
         .headers(headers)
         .send()
         .await?;
@@ -127,7 +145,13 @@ pub async fn get_courses(auth_token: &String) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
-pub fn login(auth_token: &String) -> std::io::Result<()> {
+/*
+function: login
+Description: This function will allow the user to login to their canvas account
+Parameters: auth_token
+Return: Result<(), Box<dyn Error>>
+ */
+pub fn login(auth_token: &String, school_url: &String) -> std::io::Result<()> {
     println!("{}", &auth_token);
     let path = std::path::Path::new(".env");
     let display = path.display();
@@ -135,7 +159,11 @@ pub fn login(auth_token: &String) -> std::io::Result<()> {
         Err(why) => panic!("couldn't create {}: {}", display, why),
         Ok(file) => file,
     };
-    match env_file.write_all(format!("CANVAS_AUTH_TOKEN={}", auth_token).as_bytes()) {
+    match env_file.write_all(format!("CANVAS_AUTH_TOKEN={}\n", auth_token).as_bytes()) {
+        Err(why) => panic!("couldn't write to {}: {}", display, why),
+        Ok(_) => println!("successfully wrote to {}", display),
+    }
+    match env_file.write_all(format!("SCHOOL_BASE_URL={}\n", school_url).as_bytes()) {
         Err(why) => panic!("couldn't write to {}: {}", display, why),
         Ok(_) => println!("successfully wrote to {}", display),
     }
