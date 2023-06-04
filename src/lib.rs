@@ -1,5 +1,8 @@
 mod data;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
+use std::error::Error;
+use std::fs::File;
+use std::io::Write;
 
 /*
 Plan for building the Canvas CLI
@@ -26,13 +29,6 @@ Plan for building the Canvas CLI
 
 // For now I can start with using manual token generation, however, I will need to use OATH2 to get the token
 
-/*
-function: login
-Description: This function will allow the user to login to their canvas account
-Parameters: auth_token
-Return: Result<(), Box<dyn Error>>
- */
-
 pub struct Config {
     pub auth_token: Option<String>,
     pub command: Option<String>,
@@ -44,9 +40,15 @@ impl Config {
         if args.len() < 2 {
             return Err("not enough arguments");
         }
+        let _help_message = "usage: canva [-h | --help]\n <command> [<args>]\n\n";
         let command = args[1].clone();
-        let auth_token = std::env::var("CANVAS_AUTH_TOKEN").ok();
-        let course_id = args.get(2).cloned();
+        let auth_token: Option<String>;
+        if let Some(token) = args.get(2) {
+            auth_token = Some(token.clone());
+        } else {
+            auth_token = std::env::var("CANVAS_AUTH_TOKEN").ok();
+        }
+        let course_id = args.get(3).cloned();
         Ok(Config {
             auth_token,
             command: Some(command),
@@ -54,6 +56,35 @@ impl Config {
         })
     }
 }
+
+pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    match config.command {
+        Some(command) => match command.as_str() {
+            "account" => {
+                let auth_token = config.auth_token.unwrap();
+                account_info(&auth_token)?;
+            }
+            "courses" => {
+                let auth_token = config.auth_token.unwrap();
+                get_courses(&auth_token)?;
+            }
+            "login" => {
+                let auth_token = config.auth_token.unwrap();
+                login(&auth_token)?;
+            }
+            _ => println!("Command not found"),
+        },
+        None => println!("Command not found"),
+    }
+    Ok(())
+}
+
+/*
+function: account
+Description: This function will allow the user to login to their canvas account
+Parameters: auth_token
+Return: Result<(), Box<dyn Error>>
+ */
 #[tokio::main]
 pub async fn account_info(auth_token: &String) -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
@@ -72,6 +103,12 @@ pub async fn account_info(auth_token: &String) -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
+/*
+function: courses
+Description: This function will allow the user to login to their canvas account
+Parameters: auth_token -> but not actually required by user
+Return: Result<(), Box<dyn Error>>
+ */
 #[tokio::main]
 pub async fn get_courses(auth_token: &String) -> Result<(), Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
@@ -87,5 +124,20 @@ pub async fn get_courses(auth_token: &String) -> Result<(), Box<dyn std::error::
     // println!("Coming from Lib and response data: {:#?}", resp);
     let resp_json = resp.json::<Vec<data::Course>>().await?;
     println!("Coming from Lib and response data: {:#?}", resp_json);
+    Ok(())
+}
+
+pub fn login(auth_token: &String) -> std::io::Result<()> {
+    println!("{}", &auth_token);
+    let path = std::path::Path::new(".env");
+    let display = path.display();
+    let mut env_file = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}", display, why),
+        Ok(file) => file,
+    };
+    match env_file.write_all(format!("CANVAS_AUTH_TOKEN={}", auth_token).as_bytes()) {
+        Err(why) => panic!("couldn't write to {}: {}", display, why),
+        Ok(_) => println!("successfully wrote to {}", display),
+    }
     Ok(())
 }
