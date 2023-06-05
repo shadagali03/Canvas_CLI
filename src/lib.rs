@@ -1,6 +1,8 @@
+extern crate rpassword;
 mod data;
 mod help;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
+use rpassword::read_password;
 use std::env;
 use std::fs::File;
 use std::io::Write;
@@ -27,6 +29,7 @@ Plan for building the Canvas CLI
     - COMMAND: canva submit <course_id> <file/files>
     - this will submit the file/files to the course as well as add a comment
  */
+
 pub struct Config {
     pub command: Option<String>,
     pub arguments: Vec<String>,
@@ -56,8 +59,7 @@ pub fn run(config: Config) -> Result<(), &'static str> {
             // Handle: canva account
             "account" => {
                 if config.arguments.len() == 0 {
-                    let auth_token = env::var("CANVAS_AUTH_TOKEN").expect("AUTH_TOKEN not set");
-                    account_info(&auth_token).expect("Error getting account info");
+                    account_info().expect("Error getting account info");
                 } else {
                     return Err("Too many arguments");
                 }
@@ -65,8 +67,7 @@ pub fn run(config: Config) -> Result<(), &'static str> {
             // Handle: canva courses
             "courses" => {
                 if config.arguments.len() == 0 {
-                    let auth_token = env::var("CANVAS_AUTH_TOKEN").expect("AUTH_TOKEN not set");
-                    get_courses(&auth_token).expect("Error getting courses");
+                    get_courses().expect("Error getting courses");
                 } else {
                     return Err("Too many arguments");
                 }
@@ -102,12 +103,14 @@ Parameters: auth_token
 Return: Result<(), Box<dyn Error>>
  */
 #[tokio::main]
-pub async fn account_info(auth_token: &String) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn account_info() -> Result<(), Box<dyn std::error::Error>> {
     let api_path = format!("{}/api/v1/users/self", env::var("SCHOOL_BASE_URL").unwrap());
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
-        format!("Bearer {}", auth_token).parse().unwrap(),
+        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
+            .parse()
+            .unwrap(),
     );
     let resp = reqwest::Client::new()
         .get(api_path.as_str())
@@ -127,12 +130,14 @@ Parameters: auth_token -> but not actually required by user
 Return: Result<(), Box<dyn Error>>
  */
 #[tokio::main]
-pub async fn get_courses(auth_token: &String) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
     let api_path = format!("{}/api/v1/courses", env::var("SCHOOL_BASE_URL").unwrap());
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
-        format!("Bearer {}", auth_token).parse().unwrap(),
+        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
+            .parse()
+            .unwrap(),
     );
     let resp = reqwest::Client::new()
         .get(api_path.as_str())
@@ -145,16 +150,30 @@ pub async fn get_courses(auth_token: &String) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+pub async fn submit(_config: Config) -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
+}
+
 /*
 function: login
 Description: This function will allow the user to login to their canvas account
 Parameters: auth_token
 Return: Result<(), Box<dyn Error>>
  */
+
+// Change this function to take 0 parameters and then prompt the user for the auth token and school name -> censor the auth token using
+// rpassword = "0.0.4" crate
 pub fn login(auth_token: &String, school_url: &String) -> std::io::Result<()> {
-    println!("{}", &auth_token);
     let path = std::path::Path::new(".env");
     let display = path.display();
+    print!("Enter Canvas School URL: ");
+    let mut line = String::new();
+    let _school_url = std::io::stdin().read_line(&mut line).unwrap();
+    print!("\nEnter Canvas Auth Token: ");
+    std::io::stdout().flush().unwrap();
+    let _auth_token = read_password().unwrap();
+    println!("The password is: '{}'", _auth_token);
+
     let mut env_file = match File::create(&path) {
         Err(why) => panic!("couldn't create {}: {}", display, why),
         Ok(file) => file,
