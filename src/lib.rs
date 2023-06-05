@@ -1,4 +1,5 @@
 mod data;
+mod help;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
 use std::env;
 use std::fs::File;
@@ -26,9 +27,6 @@ Plan for building the Canvas CLI
     - COMMAND: canva submit <course_id> <file/files>
     - this will submit the file/files to the course as well as add a comment
  */
-
-// For now I can start with using manual token generation, however, I will need to use OATH2 to get the token
-
 pub struct Config {
     pub command: Option<String>,
     pub arguments: Vec<String>,
@@ -41,12 +39,6 @@ impl Config {
         }
         let _help_message = "usage: canva [-h | --help]\n <command> [<args>]\n\n";
         let command = args[1].clone();
-        // if let Some(token) = args.get(2) {
-        //     auth_token = Some(token.clone());
-        // } else {
-        //     auth_token = std::env::var("CANVAS_AUTH_TOKEN").ok();
-        // }
-        // let course_id = args.get(3).cloned();
         Ok(Config {
             command: Some(command),
             arguments: args[2..].to_vec(),
@@ -54,9 +46,14 @@ impl Config {
     }
 }
 
+// For now I can start with using manual token generation, however, I will need to use OATH2 to get the token
+
+// Will be given a config struct that will have the command and arguments
 pub fn run(config: Config) -> Result<(), &'static str> {
     match config.command {
+        // Handle the commands using the run function
         Some(command) => match command.as_str() {
+            // Handle: canva account
             "account" => {
                 if config.arguments.len() == 0 {
                     let auth_token = env::var("CANVAS_AUTH_TOKEN").expect("AUTH_TOKEN not set");
@@ -65,6 +62,7 @@ pub fn run(config: Config) -> Result<(), &'static str> {
                     return Err("Too many arguments");
                 }
             }
+            // Handle: canva courses
             "courses" => {
                 if config.arguments.len() == 0 {
                     let auth_token = env::var("CANVAS_AUTH_TOKEN").expect("AUTH_TOKEN not set");
@@ -73,6 +71,7 @@ pub fn run(config: Config) -> Result<(), &'static str> {
                     return Err("Too many arguments");
                 }
             }
+            // Handle canva login <auth_token> <school_name>
             "login" => {
                 let auth_token;
                 let school: String;
@@ -88,9 +87,10 @@ pub fn run(config: Config) -> Result<(), &'static str> {
                 }
                 login(&auth_token, &school).expect("Error logging in");
             }
+            "help" => println!("{}", help::help_message()),
             _ => println!("Command not found"),
         },
-        None => println!("Command not found"),
+        None => println!("Must Enter A Command!"),
     }
     Ok(())
 }
