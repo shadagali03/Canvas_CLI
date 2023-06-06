@@ -1,11 +1,12 @@
 extern crate rpassword;
 mod data;
 mod help;
+use colored::Colorize;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
 use rpassword::read_password;
 use std::env;
 use std::fs::File;
-use std::io::Write;
+use std::io::{self, Write};
 
 /*
 Plan for building the Canvas CLI
@@ -28,6 +29,22 @@ Plan for building the Canvas CLI
 - Submit the files to the course
     - COMMAND: canva submit <course_id> <file/files>
     - this will submit the file/files to the course as well as add a comment
+ */
+
+/*
+ - Change code to follow this format, return as an Ok(resp)
+pub fn get_weather(cty: &Vec<String>, st: &Vec<String>) -> Result<WeatherResponse, Box<dyn std::error::Error>> {
+    // some stuff here
+    let url = reqwest::Url::parse_with_params(url, &params)?;
+    let res: WeatherResponse = blocking::get(url)?.json()?;
+    Ok(res)
+}
+
+match api_call::get_weather(&input.city, &input.state) {
+    Ok(res) => // do some stuff,
+    Err(err) => println!("Error: {}", err)
+}
+
  */
 
 pub struct Config {
@@ -74,19 +91,7 @@ pub fn run(config: Config) -> Result<(), &'static str> {
             }
             // Handle canva login <auth_token> <school_name>
             "login" => {
-                let auth_token;
-                let school: String;
-                if let Some(token) = config.arguments.get(0) {
-                    auth_token = token.clone();
-                } else {
-                    return Err("No auth token provided");
-                }
-                if let Some(school_name) = config.arguments.get(1) {
-                    school = school_name.clone();
-                } else {
-                    return Err("No school name provided");
-                }
-                login(&auth_token, &school).expect("Error logging in");
+                login().expect("Error logging in");
             }
             "help" => println!("{}", help::help_message()),
             _ => println!("Command not found"),
@@ -145,34 +150,50 @@ pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
         .send()
         .await?;
     // println!("Coming from Lib and response data: {:#?}", resp);
-    let resp_json = resp.json::<Vec<data::Course>>().await?;
-    println!("Coming from Lib and response data: {:#?}", resp_json);
+    let user_courses = resp.json::<Vec<data::Course>>().await?;
+    let mut valid_courses: Vec<data::ValidCourse> = Vec::new();
+
+    for course in user_courses.iter() {
+        match &course.name {
+            Some(name) => match &course.course_code {
+                Some(code) => valid_courses.push(data::ValidCourse::new(
+                    name.clone(),
+                    code.clone(),
+                    course.id.clone(),
+                )),
+                None => (),
+            },
+            None => (),
+        }
+    }
+
+    println!(
+        "{0: <25} {1: <50} {2: <10}",
+        "Course Name".blue(),
+        "Course Code".blue(),
+        "Course ID".blue()
+    );
+
+    for course in valid_courses.iter() {
+        println!(
+            "{0: <25} {1: <50} {2: <10}",
+            course.name,
+            course.course_code,
+            course.id.to_string().green()
+        );
+    }
     Ok(())
 }
 
+#[tokio::main]
 pub async fn submit(_config: Config) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/*
-function: login
-Description: This function will allow the user to login to their canvas account
-Parameters: auth_token
-Return: Result<(), Box<dyn Error>>
- */
-
-// Change this function to take 0 parameters and then prompt the user for the auth token and school name -> censor the auth token using
-// rpassword = "0.0.4" crate
-pub fn login(auth_token: &String, school_url: &String) -> std::io::Result<()> {
+// Helper function for login to write the user info to the .env file
+fn write_to_env(auth_token: &String, school_url: &String) {
     let path = std::path::Path::new(".env");
     let display = path.display();
-    print!("Enter Canvas School URL: ");
-    let mut line = String::new();
-    let _school_url = std::io::stdin().read_line(&mut line).unwrap();
-    print!("\nEnter Canvas Auth Token: ");
-    std::io::stdout().flush().unwrap();
-    let _auth_token = read_password().unwrap();
-    println!("The password is: '{}'", _auth_token);
 
     let mut env_file = match File::create(&path) {
         Err(why) => panic!("couldn't create {}: {}", display, why),
@@ -180,11 +201,61 @@ pub fn login(auth_token: &String, school_url: &String) -> std::io::Result<()> {
     };
     match env_file.write_all(format!("CANVAS_AUTH_TOKEN={}\n", auth_token).as_bytes()) {
         Err(why) => panic!("couldn't write to {}: {}", display, why),
-        Ok(_) => println!("successfully wrote to {}", display),
+        Ok(_) => (),
     }
     match env_file.write_all(format!("SCHOOL_BASE_URL={}\n", school_url).as_bytes()) {
         Err(why) => panic!("couldn't write to {}: {}", display, why),
-        Ok(_) => println!("successfully wrote to {}", display),
+        Ok(_) => (),
     }
+    println!("\n{}", "Successfully logged in!".green())
+}
+
+// Change this function to take 0 parameters and then prompt the user for the auth token and school name -> censor the auth token using
+/*
+function: login
+Description: This function will allow the user to login to their canvas account
+Parameters: auth_token
+Return: Result<(), Box<dyn Error>>
+ */
+#[tokio::main]
+pub async fn login() -> Result<(), Box<dyn std::error::Error>> {
+    // Get environment path where auth and school url will be stored
+
+    let mut school_url = String::new();
+    print!("Enter Canvas School URL: ");
+    io::stdout().flush().unwrap();
+    std::io::stdin().read_line(&mut school_url).unwrap();
+    print!("\nEnter Canvas Auth Token: ");
+    std::io::stdout().flush().unwrap();
+    let auth_token = read_password().unwrap();
+    // Need to use the variables as the .env file is not flushed and will cause errors
+    let api_path = format!("{}/api/v1/courses", school_url);
+    let mut headers = HeaderMap::new();
+
+    headers.insert(
+        AUTHORIZATION,
+        format!("Bearer {}", auth_token).parse().unwrap(),
+    );
+    let resp = reqwest::Client::new()
+        .get(api_path.as_str())
+        .headers(headers)
+        .send()
+        .await;
+
+    match resp {
+        Ok(_) => write_to_env(&auth_token, &school_url),
+        Err(_) => println!("{}", "Error Logging in! Try again".red()),
+    }
+
+    Ok(())
+}
+
+/*
+function: assignments
+Description: Will return all the assignments within a course
+Paramters: course_id
+ */
+#[tokio::main]
+pub async fn get_assignments(_course_id: &i32) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }

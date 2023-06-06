@@ -1,4 +1,22 @@
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct ValidCourse {
+    pub name: String,
+    pub course_code: String,
+    pub id: i64,
+}
+
+impl ValidCourse {
+    pub fn new(name: String, course_code: String, id: i64) -> ValidCourse {
+        ValidCourse {
+            name,
+            course_code,
+            id,
+        }
+    }
+}
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Account {
     id: i64,
@@ -21,15 +39,15 @@ pub struct Permissions {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Course {
-    id: i64,
-    name: Option<String>,
+    pub id: i64,
+    pub name: Option<String>,
     account_id: Option<i64>,
     uuid: Option<String>,
     start_at: Option<String>,
     grading_standard_id: Option<i64>,
     is_public: Option<bool>,
     created_at: Option<String>,
-    course_code: Option<String>,
+    pub course_code: Option<String>,
     default_view: Option<String>,
     root_account_id: Option<i64>,
     enrollment_term_id: Option<i64>,
