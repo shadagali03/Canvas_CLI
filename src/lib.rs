@@ -89,6 +89,15 @@ pub fn run(config: Config) -> Result<(), &'static str> {
                     return Err("Too many arguments");
                 }
             }
+
+            "assignments" => {
+                if config.arguments.len() == 1 {
+                    get_assignments(&config.arguments[0].parse::<i64>().unwrap())
+                        .expect("Error getting assignments");
+                } else {
+                    return Err("Must provide a course id");
+                }
+            }
             // Handle canva login <auth_token> <school_name>
             "login" => {
                 login().expect("Error logging in");
@@ -159,7 +168,7 @@ pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
                 Some(code) => valid_courses.push(data::ValidCourse::new(
                     name.clone(),
                     code.clone(),
-                    course.id.clone(),
+                    course.id,
                 )),
                 None => (),
             },
@@ -169,8 +178,8 @@ pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "{0: <25} {1: <50} {2: <10}",
-        "Course Name".blue(),
         "Course Code".blue(),
+        "Course Name".blue(),
         "Course ID".blue()
     );
 
@@ -185,6 +194,61 @@ pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/*
+function: assignments
+Description: Will return all the assignments within a course
+Paramters: course_id
+ */
+#[tokio::main]
+pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::Error>> {
+    let api_path = format!(
+        "{}/api/v1/courses/{}/assignments",
+        env::var("SCHOOL_BASE_URL").unwrap(),
+        course_id
+    );
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
+            .parse()
+            .unwrap(),
+    );
+    let resp = reqwest::Client::new()
+        .get(api_path.as_str())
+        .headers(headers)
+        .send()
+        .await?;
+
+    let course_assignments = resp.json::<Vec<data::Assignment>>().await?;
+    let mut valid_assignments: Vec<data::ValidAssignment> = Vec::new();
+
+    valid_assignments.extend(course_assignments.iter().filter_map(|assignment| {
+        assignment.due_at.as_ref().and_then(|due_date| {
+            assignment.name.as_ref().and_then(|name| {
+                assignment
+                    .id
+                    .map(|id| data::ValidAssignment::new(name.clone(), id, due_date.clone()))
+            })
+        })
+    }));
+
+    println!(
+        "{0: <25} {1: <50} {2: <10}",
+        "Assignment Name".blue(),
+        "Due Date".blue(),
+        "Assignment ID".blue()
+    );
+
+    for assignment in valid_assignments.iter() {
+        println!(
+            "{0: <25} {1: <50} {2: <10}",
+            assignment.name,
+            assignment.due_at,
+            assignment.id.to_string().green()
+        );
+    }
+    Ok(())
+}
 #[tokio::main]
 pub async fn submit(_config: Config) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
@@ -247,15 +311,5 @@ pub async fn login() -> Result<(), Box<dyn std::error::Error>> {
         Err(_) => println!("{}", "Error Logging in! Try again".red()),
     }
 
-    Ok(())
-}
-
-/*
-function: assignments
-Description: Will return all the assignments within a course
-Paramters: course_id
- */
-#[tokio::main]
-pub async fn get_assignments(_course_id: &i32) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
