@@ -1,6 +1,7 @@
 extern crate rpassword;
 mod data;
 mod help;
+use chrono::prelude::*;
 use colored::Colorize;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
 use rpassword::read_password;
@@ -162,19 +163,16 @@ pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
     let user_courses = resp.json::<Vec<data::Course>>().await?;
     let mut valid_courses: Vec<data::ValidCourse> = Vec::new();
 
-    for course in user_courses.iter() {
-        match &course.name {
-            Some(name) => match &course.course_code {
-                Some(code) => valid_courses.push(data::ValidCourse::new(
-                    name.clone(),
-                    code.clone(),
-                    course.id,
-                )),
-                None => (),
-            },
-            None => (),
+    valid_courses.extend(user_courses.iter().filter_map(|course| {
+        match (&course.name, &course.course_code) {
+            (Some(name), Some(code)) => Some(data::ValidCourse::new(
+                name.clone(),
+                code.clone(),
+                course.id,
+            )),
+            _ => None,
         }
-    }
+    }));
 
     println!(
         "{0: <25} {1: <50} {2: <10}",
@@ -224,16 +222,20 @@ pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::
 
     valid_assignments.extend(course_assignments.iter().filter_map(|assignment| {
         assignment.due_at.as_ref().and_then(|due_date| {
+            let new_date = DateTime::parse_from_rfc3339(due_date)
+                .unwrap()
+                .format("%m-%d-%Y")
+                .to_string();
             assignment.name.as_ref().and_then(|name| {
                 assignment
                     .id
-                    .map(|id| data::ValidAssignment::new(name.clone(), id, due_date.clone()))
+                    .map(|id| data::ValidAssignment::new(name.clone(), id, new_date.clone()))
             })
         })
     }));
 
     println!(
-        "{0: <25} {1: <50} {2: <10}",
+        "{0: <40} {1: <20} {2: <10}",
         "Assignment Name".blue(),
         "Due Date".blue(),
         "Assignment ID".blue()
@@ -241,7 +243,7 @@ pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::
 
     for assignment in valid_assignments.iter() {
         println!(
-            "{0: <25} {1: <50} {2: <10}",
+            "{0: <40} {1: <20} {2: <10}",
             assignment.name,
             assignment.due_at,
             assignment.id.to_string().green()
