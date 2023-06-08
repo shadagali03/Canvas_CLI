@@ -1,12 +1,14 @@
 extern crate rpassword;
+mod api_calls;
 mod data;
 mod help;
 use chrono::prelude::*;
 use colored::Colorize;
+use data::FileUpload;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
 use rpassword::read_password;
 use std::env;
-use std::fs::File;
+use std::fs::{canonicalize, File};
 use std::io::{self, Write};
 
 /*
@@ -48,6 +50,7 @@ match api_call::get_weather(&input.city, &input.state) {
 
  */
 
+// Gets the command line input
 pub struct Config {
     pub command: Option<String>,
     pub arguments: Vec<String>,
@@ -58,16 +61,12 @@ impl Config {
         if args.len() < 2 {
             return Err("not enough arguments");
         }
-        let _help_message = "usage: canva [-h | --help]\n <command> [<args>]\n\n";
-        let command = args[1].clone();
         Ok(Config {
-            command: Some(command),
-            arguments: args[2..].to_vec(),
+            command: Some(args[1].clone()), // Gets the first input which should be the command
+            arguments: args[2..].to_vec(), // Gets the rest of the inputs which should be the arguments
         })
     }
 }
-
-// For now I can start with using manual token generation, however, I will need to use OATH2 to get the token
 
 // Will be given a config struct that will have the command and arguments
 pub fn run(config: Config) -> Result<(), &'static str> {
@@ -91,6 +90,7 @@ pub fn run(config: Config) -> Result<(), &'static str> {
                 }
             }
 
+            // Handle: canva assignments <course_id>
             "assignments" => {
                 if config.arguments.len() == 1 {
                     get_assignments(&config.arguments[0].parse::<i64>().unwrap())
@@ -99,14 +99,29 @@ pub fn run(config: Config) -> Result<(), &'static str> {
                     return Err("Must provide a course id");
                 }
             }
-            // Handle canva login <auth_token> <school_name>
+
+            // Handle canva login
             "login" => {
-                login().expect("Error logging in");
+                if config.arguments.len() == 0 {
+                    login().expect("Error logging in");
+                } else {
+                    return Err("Too many arguments");
+                }
             }
+
+            // Handle: canva add <file_path>
+            "add" => {
+                if config.arguments.len() < 1 {
+                    return Err("Must provide a file path");
+                }
+                add_file(&config.arguments[0]).expect("Error adding file");
+            }
+
+            // Handle: canva help
             "help" => println!("{}", help::help_message()),
-            _ => println!("Command not found"),
+            _ => println!("{}", "Command not found".red()),
         },
-        None => println!("Must Enter A Command!"),
+        None => println!("{}", "Must Enter A Command!".red()),
     }
     Ok(())
 }
@@ -119,6 +134,7 @@ Return: Result<(), Box<dyn Error>>
  */
 #[tokio::main]
 pub async fn account_info() -> Result<(), Box<dyn std::error::Error>> {
+    // Will abstract this later to just be an api call that takes three params (api_path, data structure that JSON will be mapped to))
     let api_path = format!("{}/api/v1/users/self", env::var("SCHOOL_BASE_URL").unwrap());
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -132,9 +148,9 @@ pub async fn account_info() -> Result<(), Box<dyn std::error::Error>> {
         .headers(headers)
         .send()
         .await?;
-    // println!("Coming from Lib and response data: {:#?}", resp);
-    let resp_json = resp.json::<data::Account>().await?;
-    println!("Coming from Lib and response data: {:#?}", resp_json);
+
+    let account_info = resp.json::<data::Account>().await?;
+    println!("Coming from Lib and response data: {:#?}", account_info);
     Ok(())
 }
 
@@ -251,9 +267,36 @@ pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::
     }
     Ok(())
 }
+/*
+function: canva add <file_path>
+Description: This function will allow the user to submit an assignment
+Parameters: course_id, assignment_id, file_path
+Return: Result<(FileUpload), Box<dyn Error>>
+
+- This will be step 1 in uploading a file to canvas.
+- The FileUpload struct will be used to store the response from the API call
+
+These are the endpoints that will be used for this function
+https://sit.instructure.com/api/v1/users/self/files
+ */
 #[tokio::main]
-pub async fn submit(_config: Config) -> Result<(), Box<dyn std::error::Error>> {
-    Ok(())
+pub async fn add_file(file_path: &String) -> Result<data::FileUpload, Box<dyn std::error::Error>> {
+    let full_file_path = &canonicalize(file_path).unwrap();
+    let split_path: Vec<&str> = full_file_path.to_str().unwrap().split("/").collect();
+    let parent_path = &split_path[0..split_path.len() - 1].join("/");
+    let file_name = &split_path[split_path.len() - 1];
+    // let parent_path = split_path
+    println!(
+        "parent path: {:?} and child path: {:?}",
+        parent_path, file_name
+    );
+    let temp: FileUpload = data::FileUpload::new(
+        "t".to_string(),
+        "a".to_string(),
+        "t".to_string(),
+        "a".to_string(),
+    );
+    Ok(temp)
 }
 
 // Helper function for login to write the user info to the .env file

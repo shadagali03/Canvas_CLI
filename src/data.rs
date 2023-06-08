@@ -2,6 +2,11 @@ use serde::{Deserialize, Serialize};
 
 // Use this site to construct the structs: https://quicktype.io/
 
+pub enum DataTypes {
+    Assignment,
+    Course,
+}
+
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct ValidCourse {
@@ -244,4 +249,37 @@ pub struct RubricSettings {
     free_form_criterion_comments: Option<bool>,
     hide_score_total: Option<bool>,
     hide_points: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileUpload {
+    file_param: Option<String>,
+    progress: Option<serde_json::Value>,
+    upload_url: Option<String>,
+    upload_params: Option<UploadParams>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UploadParams {
+    filename: Option<String>,
+    content_type: Option<String>,
+}
+
+impl FileUpload {
+    pub fn new(
+        file_param: String,
+        upload_url: String,
+        filename: String,
+        content_type: String,
+    ) -> FileUpload {
+        FileUpload {
+            file_param: Some(file_param),
+            progress: None,
+            upload_url: Some(upload_url),
+            upload_params: Some(UploadParams {
+                filename: Some(filename),
+                content_type: Some(content_type),
+            }),
+        }
+    }
 }
