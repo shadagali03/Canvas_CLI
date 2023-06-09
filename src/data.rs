@@ -2,10 +2,10 @@ use serde::{Deserialize, Serialize};
 
 // Use this site to construct the structs: https://quicktype.io/
 
-pub enum DataTypes {
-    Assignment,
-    Course,
-}
+// pub enum DataTypes {
+//     Assignment,
+//     Course,
+// }
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -251,7 +251,7 @@ pub struct RubricSettings {
     hide_points: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FileUpload {
     file_param: Option<String>,
     progress: Option<serde_json::Value>,
@@ -259,7 +259,7 @@ pub struct FileUpload {
     upload_params: Option<UploadParams>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UploadParams {
     filename: Option<String>,
     content_type: Option<String>,

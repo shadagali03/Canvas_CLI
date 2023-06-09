@@ -1,14 +1,15 @@
 extern crate rpassword;
+use data::FileUpload;
+use reqwest::multipart;
 mod api_calls;
 mod data;
 mod help;
 use chrono::prelude::*;
 use colored::Colorize;
-use data::FileUpload;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
 use rpassword::read_password;
 use std::env;
-use std::fs::{canonicalize, File};
+use std::fs::{canonicalize, metadata, File};
 use std::io::{self, Write};
 
 /*
@@ -281,24 +282,50 @@ https://sit.instructure.com/api/v1/users/self/files
  */
 #[tokio::main]
 pub async fn add_file(file_path: &String) -> Result<data::FileUpload, Box<dyn std::error::Error>> {
-    let full_file_path = &canonicalize(file_path).unwrap();
+    let full_file_path = canonicalize(file_path).unwrap();
     let split_path: Vec<&str> = full_file_path.to_str().unwrap().split("/").collect();
     let parent_path = &split_path[0..split_path.len() - 1].join("/");
-    let file_name = &split_path[split_path.len() - 1];
-    // let parent_path = split_path
+    let file_name = split_path[split_path.len() - 1];
+    let file_size = metadata(&full_file_path)?.len();
     println!(
-        "parent path: {:?} and child path: {:?}",
-        parent_path, file_name
+        "parent path: {:?} and child path: {:?} file size: {:?}",
+        parent_path, file_name, file_size
     );
-    let temp: FileUpload = data::FileUpload::new(
-        "t".to_string(),
-        "a".to_string(),
-        "t".to_string(),
-        "a".to_string(),
+    let api_path = format!(
+        "{}/api/v1/users/self/files",
+        env::var("SCHOOL_BASE_URL").unwrap(),
     );
-    Ok(temp)
+    let mut headers = HeaderMap::new();
+
+    let form: reqwest::multipart::Form = multipart::Form::new()
+        .text("size", file_size.to_string())
+        .text("parent_folder_path", parent_path.clone())
+        .text("file", file_name.to_string());
+
+    headers.insert(
+        AUTHORIZATION,
+        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
+            .parse()
+            .unwrap(),
+    );
+
+    let resp = reqwest::Client::new()
+        .post(api_path.as_str())
+        .headers(headers)
+        .multipart(form)
+        .send()
+        .await?;
+
+    println!("{:?}", resp);
+    let file_upload_data = resp.json::<data::FileUpload>().await?;
+    println!("{:?}", file_upload_data);
+    Ok(file_upload_data)
 }
 
+#[tokio::main]
+pub async fn commit_file(_file_data: FileUpload) -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
+}
 // Helper function for login to write the user info to the .env file
 fn write_to_env(auth_token: &String, school_url: &String) {
     let path = std::path::Path::new(".env");
