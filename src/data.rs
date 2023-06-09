@@ -288,7 +288,7 @@ impl FileUpload {
 pub struct CommitData {
     location: Option<String>,
     instfs_uuid: Option<String>,
-    id: Option<i64>,
+    pub id: Option<i64>,
     uuid: Option<String>,
     folder_id: Option<i64>,
     display_name: Option<String>,

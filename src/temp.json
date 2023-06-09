@@ -1,9 +1,0 @@
-{
-  "file_param": "file",
-  "progress": null,
-  "upload_url": "https://inst-fs-iad-prod.inscloudgate.net/files?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE2ODYyNTM1MDMsInVzZXJfaWQiOiIxMDMwMDAwMDAwMDA1ODM5MyIsInJlc291cmNlIjoiL2ZpbGVzIiwiY2FwdHVyZV91cmwiOiJodHRwczovL3NpdC5pbnN0cnVjdHVyZS5jb20vYXBpL3YxL2ZpbGVzL2NhcHR1cmUiLCJjYXB0dXJlX3BhcmFtcyI6eyJjb250ZXh0X3R5cGUiOiJVc2VyIiwiY29udGV4dF9pZCI6IjEwMzAwMDAwMDAwMDU4MzkzIiwidXNlcl9pZCI6IjEwMzAwMDAwMDAwMDU4MzkzIiwiZm9sZGVyX2lkIjoiMTAzMDAwMDAwMDEyNTU0NDIiLCJyb290X2FjY291bnRfaWQiOiIxMDMwMDAwMDAwMDAwMDAwMSIsInF1b3RhX2V4ZW1wdCI6ZmFsc2UsIm9uX2R1cGxpY2F0ZSI6Im92ZXJ3cml0ZSIsInByb2dyZXNzX2lkIjpudWxsLCJpbmNsdWRlIjpudWxsfSwibGVnYWN5X2FwaV9kZXZlbG9wZXJfa2V5X2lkIjoiMTcwMDAwMDAwMDAwMDE2IiwibGVnYWN5X2FwaV9yb290X2FjY291bnRfaWQiOiIxMDMwMDAwMDAwMDAwMDAwMSIsImV4cCI6MTY4NjI1NDEwM30.CVYQRvD9RDZGwJOZLQTdqk5qIy-ERudomtXKy9MCESwPvCHpPFGYjCieM90Q8Sc8KcKi3XB6NH9_tlqeGM2JJQ",
-  "upload_params": {
-    "filename": "test_submission.c",
-    "content_type": "text/x-csrc"
-  }
-}

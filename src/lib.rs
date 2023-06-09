@@ -1,6 +1,6 @@
 extern crate rpassword;
 extern crate serde_json;
-use data::UploadData;
+use data::{CommitData, UploadData};
 use reqwest::multipart;
 mod api_calls;
 mod data;
@@ -124,8 +124,19 @@ pub fn run(config: Config) -> Result<(), &'static str> {
                 if config.arguments.len() > 0 {
                     return Err("Too many arguments");
                 }
-                commit_file();
-                // commit_file().expect("Error committing file");
+                commit_file().expect("Error committing file");
+            }
+
+            // Handle: canva submit
+            "submit" => {
+                if config.arguments.len() != 2 {
+                    return Err("Must provide a course and assignment id");
+                }
+                submit_file(
+                    &config.arguments[0].parse::<i64>().unwrap(),
+                    &config.arguments[1].parse::<i64>().unwrap(),
+                )
+                .expect("Error submitting file");
             }
 
             // Handle: canva help
@@ -279,7 +290,7 @@ pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 /*
-function: canva add <file_path>
+function: canva add [<file_path>] -> can be multiple files
 Description: This function will allow the user to submit an assignment
 Parameters: course_id, assignment_id, file_path
 Return: Result<(UploadData), Box<dyn Error>>
@@ -332,7 +343,10 @@ pub async fn add_file(file_path: &String) -> Result<data::UploadData, Box<dyn st
         file_name.to_string(),
         parent_path.to_string(),
     );
-    serde_json::to_writer(&File::create("upload_data.json")?, &upload_json)?;
+    serde_json::to_writer(
+        &File::create("src/secrets/.upload_data.json")?,
+        &upload_json,
+    )?;
 
     println!("{:?}", upload_json);
 
@@ -347,7 +361,7 @@ return: Result<(CommitData), Box<dyn Error>>
 */
 #[tokio::main]
 pub async fn commit_file() -> Result<data::CommitData, Box<dyn std::error::Error>> {
-    let file = File::open("upload_data.json").expect("File could not be read");
+    let file = File::open("src/secrets/.upload_data.json").expect("File could not be read");
     let file_upload_data: UploadData = serde_json::from_reader(file).expect("Error reading file");
 
     let form: reqwest::multipart::Form = multipart::Form::new()
@@ -379,7 +393,59 @@ pub async fn commit_file() -> Result<data::CommitData, Box<dyn std::error::Error
         .await?;
 
     let commit_data = resp.json::<data::CommitData>().await?;
+    serde_json::to_writer(
+        &File::create("src/secrets/.commit_data.json")?,
+        &commit_data,
+    )?;
     Ok(commit_data)
+}
+/*
+function: canva submit <course_id> <assignment_id>
+Description: This function will submit the file to canvas
+Parameters: course_id, assignment_id
+Return: Result<(SubmissionData), Box<dyn Error>>
+*/
+#[tokio::main]
+pub async fn submit_file(
+    course_id: &i64,
+    assignment_id: &i64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let file = File::open("src/secrets/.commit_data.json").expect("File could not be read");
+    let file_upload_data: CommitData = serde_json::from_reader(file).expect("Error reading file");
+    let form: reqwest::multipart::Form = multipart::Form::new()
+        .text("submission[submission_type]", "online_upload")
+        .text(
+            "submission[file_ids][]",
+            file_upload_data.id.unwrap().to_string(),
+        );
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
+            .parse()
+            .unwrap(),
+    );
+
+    let submission_path = format!(
+        "{}/api/v1/courses/{}/assignments/{}/submissions",
+        env::var("SCHOOL_BASE_URL").unwrap(),
+        course_id,
+        assignment_id
+    );
+
+    let resp = reqwest::Client::new()
+        .post(submission_path)
+        .headers(headers)
+        .multipart(form)
+        .send()
+        .await;
+
+    match resp {
+        Ok(_) => println!("{}", "File submitted successfully!".green()),
+        Err(_) => println!("{}", "Error Logging in! Try again".red()),
+    }
+    Ok(())
 }
 // Helper function for login to write the user info to the .env file
 fn write_to_env(auth_token: &String, school_url: &String) {

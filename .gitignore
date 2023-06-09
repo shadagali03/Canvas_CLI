@@ -1,2 +1,4 @@
 /target
 .env
+/src/secrets/.upload_data.json
+/src/secrets/.commit_data.json
