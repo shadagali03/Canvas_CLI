@@ -255,14 +255,14 @@ pub struct RubricSettings {
 pub struct FileUpload {
     file_param: Option<String>,
     progress: Option<serde_json::Value>,
-    upload_url: Option<String>,
-    upload_params: Option<UploadParams>,
+    pub upload_url: Option<String>,
+    pub upload_params: Option<UploadParams>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UploadParams {
     filename: Option<String>,
-    content_type: Option<String>,
+    pub content_type: Option<String>,
 }
 
 impl FileUpload {
@@ -280,6 +280,53 @@ impl FileUpload {
                 filename: Some(filename),
                 content_type: Some(content_type),
             }),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommitData {
+    location: Option<String>,
+    instfs_uuid: Option<String>,
+    id: Option<i64>,
+    uuid: Option<String>,
+    folder_id: Option<i64>,
+    display_name: Option<String>,
+    filename: Option<String>,
+    upload_status: Option<String>,
+    #[serde(rename = "content-type")]
+    content_type: Option<String>,
+    url: Option<String>,
+    size: Option<i64>,
+    created_at: Option<String>,
+    updated_at: Option<String>,
+    unlock_at: Option<serde_json::Value>,
+    locked: Option<bool>,
+    hidden: Option<bool>,
+    lock_at: Option<serde_json::Value>,
+    hidden_for_user: Option<bool>,
+    thumbnail_url: Option<serde_json::Value>,
+    modified_at: Option<String>,
+    mime_class: Option<String>,
+    media_entry_id: Option<serde_json::Value>,
+    category: Option<String>,
+    locked_for_user: Option<bool>,
+    preview_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UploadData {
+    pub file_data: FileUpload,
+    pub file_name: String,
+    pub parent_path: String,
+}
+
+impl UploadData {
+    pub fn new(file_data: FileUpload, file_name: String, parent_path: String) -> UploadData {
+        UploadData {
+            file_data,
+            file_name,
+            parent_path,
         }
     }
 }

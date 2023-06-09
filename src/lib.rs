@@ -1,5 +1,6 @@
 extern crate rpassword;
-use data::FileUpload;
+extern crate serde_json;
+use data::UploadData;
 use reqwest::multipart;
 mod api_calls;
 mod data;
@@ -116,6 +117,15 @@ pub fn run(config: Config) -> Result<(), &'static str> {
                     return Err("Must provide a file path");
                 }
                 add_file(&config.arguments[0]).expect("Error adding file");
+            }
+
+            // Handle: canva commit
+            "commit" => {
+                if config.arguments.len() > 0 {
+                    return Err("Too many arguments");
+                }
+                commit_file();
+                // commit_file().expect("Error committing file");
             }
 
             // Handle: canva help
@@ -272,7 +282,7 @@ pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::
 function: canva add <file_path>
 Description: This function will allow the user to submit an assignment
 Parameters: course_id, assignment_id, file_path
-Return: Result<(FileUpload), Box<dyn Error>>
+Return: Result<(UploadData), Box<dyn Error>>
 
 - This will be step 1 in uploading a file to canvas.
 - The FileUpload struct will be used to store the response from the API call
@@ -281,16 +291,12 @@ These are the endpoints that will be used for this function
 https://sit.instructure.com/api/v1/users/self/files
  */
 #[tokio::main]
-pub async fn add_file(file_path: &String) -> Result<data::FileUpload, Box<dyn std::error::Error>> {
+pub async fn add_file(file_path: &String) -> Result<data::UploadData, Box<dyn std::error::Error>> {
     let full_file_path = canonicalize(file_path).unwrap();
     let split_path: Vec<&str> = full_file_path.to_str().unwrap().split("/").collect();
     let parent_path = &split_path[0..split_path.len() - 1].join("/");
     let file_name = split_path[split_path.len() - 1];
     let file_size = metadata(&full_file_path)?.len();
-    println!(
-        "parent path: {:?} and child path: {:?} file size: {:?}",
-        parent_path, file_name, file_size
-    );
     let api_path = format!(
         "{}/api/v1/users/self/files",
         env::var("SCHOOL_BASE_URL").unwrap(),
@@ -316,15 +322,64 @@ pub async fn add_file(file_path: &String) -> Result<data::FileUpload, Box<dyn st
         .send()
         .await?;
 
-    println!("{:?}", resp);
     let file_upload_data = resp.json::<data::FileUpload>().await?;
-    println!("{:?}", file_upload_data);
-    Ok(file_upload_data)
+    // let file_upload_json = serde_json::to_string(&file_upload_data)
+    //     .unwrap()
+    //     .replace("\"", "");
+    // file_upload_json = file_upload_json[1..file_upload_json.len() - 1].to_string();
+    let upload_json = data::UploadData::new(
+        file_upload_data,
+        file_name.to_string(),
+        parent_path.to_string(),
+    );
+    serde_json::to_writer(&File::create("upload_data.json")?, &upload_json)?;
+
+    println!("{:?}", upload_json);
+
+    Ok(upload_json)
 }
 
+/*
+function: canva commit
+Description: This function will commit the file to canvas
+Paramters: None
+return: Result<(CommitData), Box<dyn Error>>
+*/
 #[tokio::main]
-pub async fn commit_file(_file_data: FileUpload) -> Result<(), Box<dyn std::error::Error>> {
-    Ok(())
+pub async fn commit_file() -> Result<data::CommitData, Box<dyn std::error::Error>> {
+    let file = File::open("upload_data.json").expect("File could not be read");
+    let file_upload_data: UploadData = serde_json::from_reader(file).expect("Error reading file");
+
+    let form: reqwest::multipart::Form = multipart::Form::new()
+        .text("parent_folder_path", file_upload_data.parent_path)
+        .text(
+            "content_type",
+            file_upload_data
+                .file_data
+                .upload_params
+                .unwrap()
+                .content_type
+                .unwrap(),
+        )
+        .text("file", file_upload_data.file_name);
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
+            .parse()
+            .unwrap(),
+    );
+
+    let resp = reqwest::Client::new()
+        .post(file_upload_data.file_data.upload_url.unwrap().as_str())
+        .headers(headers)
+        .multipart(form)
+        .send()
+        .await?;
+
+    let commit_data = resp.json::<data::CommitData>().await?;
+    Ok(commit_data)
 }
 // Helper function for login to write the user info to the .env file
 fn write_to_env(auth_token: &String, school_url: &String) {

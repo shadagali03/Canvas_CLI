@@ -1,0 +1,10 @@
+{
+  "file_data": {
+    "file_param": "file",
+    "progress": null,
+    "upload_url": "https://inst-fs-iad-prod.inscloudgate.net/files?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE2ODYzMjY2NzMsInVzZXJfaWQiOiIxMDMwMDAwMDAwMDA1ODM5MyIsInJlc291cmNlIjoiL2ZpbGVzIiwiY2FwdHVyZV91cmwiOiJodHRwczovL3NpdC5pbnN0cnVjdHVyZS5jb20vYXBpL3YxL2ZpbGVzL2NhcHR1cmUiLCJjYXB0dXJlX3BhcmFtcyI6eyJjb250ZXh0X3R5cGUiOiJVc2VyIiwiY29udGV4dF9pZCI6IjEwMzAwMDAwMDAwMDU4MzkzIiwidXNlcl9pZCI6IjEwMzAwMDAwMDAwMDU4MzkzIiwiZm9sZGVyX2lkIjoiMTAzMDAwMDAwMDEyNTU0NzgiLCJyb290X2FjY291bnRfaWQiOiIxMDMwMDAwMDAwMDAwMDAwMSIsInF1b3RhX2V4ZW1wdCI6ZmFsc2UsIm9uX2R1cGxpY2F0ZSI6Im92ZXJ3cml0ZSIsInByb2dyZXNzX2lkIjpudWxsLCJpbmNsdWRlIjpudWxsfSwibGVnYWN5X2FwaV9kZXZlbG9wZXJfa2V5X2lkIjoiMTcwMDAwMDAwMDAwMDE2IiwibGVnYWN5X2FwaV9yb290X2FjY291bnRfaWQiOiIxMDMwMDAwMDAwMDAwMDAwMSIsImV4cCI6MTY4NjMyNzI3M30.zHpwtRy25843bBwEtM6UfwcveZ5GfYBMhv2gPSIiMlfjiasbJY_dTsJlMEDh0VpLr_DMgQzt3bqnfdJGnd7U4Q",
+    "upload_params": { "filename": null, "content_type": "unknown/unknown" }
+  },
+  "file_name": "test_submission.c",
+  "parent_path": "/Users/sarang_hadagali/Code"
+}
