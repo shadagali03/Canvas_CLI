@@ -36,22 +36,6 @@ Plan for building the Canvas CLI
     - this will submit the file/files to the course as well as add a comment
  */
 
-/*
- - Change code to follow this format, return as an Ok(resp)
-pub fn get_weather(cty: &Vec<String>, st: &Vec<String>) -> Result<WeatherResponse, Box<dyn std::error::Error>> {
-    // some stuff here
-    let url = reqwest::Url::parse_with_params(url, &params)?;
-    let res: WeatherResponse = blocking::get(url)?.json()?;
-    Ok(res)
-}
-
-match api_call::get_weather(&input.city, &input.state) {
-    Ok(res) => // do some stuff,
-    Err(err) => println!("Error: {}", err)
-}
-
- */
-
 // Gets the command line input
 pub struct Config {
     pub command: Option<String>,
@@ -78,7 +62,7 @@ pub fn run(config: Config) -> Result<(), &'static str> {
             // Handle: canva account
             "account" => {
                 if config.arguments.len() == 0 {
-                    account_info().expect("Error getting account info");
+                    print_account_info(fetch_account_info().expect("Error getting account info"));
                 } else {
                     return Err("Too many arguments");
                 }
@@ -86,7 +70,7 @@ pub fn run(config: Config) -> Result<(), &'static str> {
             // Handle: canva courses
             "courses" => {
                 if config.arguments.len() == 0 {
-                    get_courses().expect("Error getting courses");
+                    print_courses(fetch_courses().expect("Error getting courses"));
                 } else {
                     return Err("Too many arguments");
                 }
@@ -95,8 +79,10 @@ pub fn run(config: Config) -> Result<(), &'static str> {
             // Handle: canva assignments <course_id>
             "assignments" => {
                 if config.arguments.len() == 1 {
-                    get_assignments(&config.arguments[0].parse::<i64>().unwrap())
-                        .expect("Error getting assignments");
+                    print_assignments(
+                        fetch_assignments(&config.arguments[0].parse::<i64>().unwrap())
+                            .expect("Error getting assignments"),
+                    );
                 } else {
                     return Err("Must provide a course id");
                 }
@@ -148,16 +134,11 @@ pub fn run(config: Config) -> Result<(), &'static str> {
     Ok(())
 }
 
-/*
-function: account
-Description: This function will allow the user to login to their canvas account
-Parameters: auth_token
-Return: Result<(), Box<dyn Error>>
- */
 #[tokio::main]
-pub async fn account_info() -> Result<(), Box<dyn std::error::Error>> {
-    // Will abstract this later to just be an api call that takes three params (api_path, data structure that JSON will be mapped to))
-    let api_path = format!("{}/api/v1/users/self", env::var("SCHOOL_BASE_URL").unwrap());
+async fn call_canvas_api<T>(path: &String) -> Result<T, &'static str>
+where
+    T: serde::de::DeserializeOwned,
+{
     let mut headers = HeaderMap::new();
     headers.insert(
         AUTHORIZATION,
@@ -166,14 +147,76 @@ pub async fn account_info() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap(),
     );
     let resp = reqwest::Client::new()
-        .get(api_path.as_str())
+        .get(path.as_str())
         .headers(headers)
         .send()
-        .await?;
+        .await;
+    match resp {
+        Ok(resp) => {
+            if resp.status().is_success() {
+                let account_info = resp.json::<T>().await.unwrap();
+                return Ok(account_info);
+            } else {
+                return Err("Error getting account info");
+            }
+        }
+        Err(_) => return Err("Error getting account info"),
+    }
+}
 
-    let account_info = resp.json::<data::Account>().await?;
-    println!("Coming from Lib and response data: {:#?}", account_info);
-    Ok(())
+#[tokio::main]
+async fn post_data_api<T>(path: &String, form: reqwest::multipart::Form) -> Result<T, &'static str>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
+            .parse()
+            .unwrap(),
+    );
+    let resp = reqwest::Client::new()
+        .post(path.as_str())
+        .headers(headers)
+        .multipart(form)
+        .send()
+        .await;
+    match resp {
+        Ok(resp) => {
+            if resp.status().is_success() {
+                let account_info = resp.json::<T>().await.unwrap();
+                return Ok(account_info);
+            } else {
+                return Err("Error getting account info");
+            }
+        }
+        Err(_) => return Err("Error getting account info"),
+    }
+}
+/*
+function: account
+Description: This function will allow the user to login to their canvas account
+Parameters: auth_token
+Return: Result<(), Box<dyn Error>>
+ */
+fn fetch_account_info() -> Result<data::Account, &'static str> {
+    // Will abstract this later to just be an api call that takes three params (api_path, data structure that JSON will be mapped to))
+    let api_path = format!("{}/api/v1/users/self", env::var("SCHOOL_BASE_URL").unwrap());
+    let user_account_information: Result<data::Account, &'static str> = call_canvas_api(&api_path);
+
+    match user_account_information {
+        Ok(resp) => Ok(resp),
+        Err(_) => Err("Error getting account info"),
+    }
+}
+
+// TODO: Change Date Created format to be more readable -> will create a function to do this
+fn print_account_info(account_info: data::Account) {
+    println!("Account Info:");
+    println!("Name: {}", account_info.name);
+    println!("ID: {}", account_info.id);
+    println!("Date Created: {}", account_info.created_at);
 }
 
 /*
@@ -182,26 +225,13 @@ Description: This function will allow the user to see what courses they are enro
 Parameters: auth_token -> but not actually required by user
 Return: Result<(), Box<dyn Error>>
  */
-#[tokio::main]
-pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
+fn fetch_courses() -> Result<Vec<data::ValidCourse>, &'static str> {
     let api_path = format!("{}/api/v1/courses", env::var("SCHOOL_BASE_URL").unwrap());
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
-            .parse()
-            .unwrap(),
-    );
-    let resp = reqwest::Client::new()
-        .get(api_path.as_str())
-        .headers(headers)
-        .send()
-        .await?;
-    // println!("Coming from Lib and response data: {:#?}", resp);
-    let user_courses = resp.json::<Vec<data::Course>>().await?;
+    let user_courses: Result<Vec<data::Course>, &'static str> = call_canvas_api(&api_path);
+
     let mut valid_courses: Vec<data::ValidCourse> = Vec::new();
 
-    valid_courses.extend(user_courses.iter().filter_map(|course| {
+    valid_courses.extend(user_courses.unwrap().iter().filter_map(|course| {
         match (&course.name, &course.course_code) {
             (Some(name), Some(code)) => Some(data::ValidCourse::new(
                 name.clone(),
@@ -211,7 +241,10 @@ pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
             _ => None,
         }
     }));
+    Ok(valid_courses)
+}
 
+fn print_courses(courses: Vec<data::ValidCourse>) {
     println!(
         "{0: <25} {1: <50} {2: <10}",
         "Course Code".blue(),
@@ -219,7 +252,7 @@ pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
         "Course ID".blue()
     );
 
-    for course in valid_courses.iter() {
+    for course in courses.iter() {
         println!(
             "{0: <25} {1: <50} {2: <10}",
             course.name,
@@ -227,7 +260,6 @@ pub async fn get_courses() -> Result<(), Box<dyn std::error::Error>> {
             course.id.to_string().green()
         );
     }
-    Ok(())
 }
 
 /*
@@ -235,30 +267,24 @@ function: assignments
 Description: Will return all the assignments within a course
 Paramters: course_id
  */
-#[tokio::main]
-pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::Error>> {
+fn fetch_assignments(course_id: &i64) -> Result<Vec<data::ValidAssignment>, &'static str> {
     let api_path = format!(
         "{}/api/v1/courses/{}/assignments",
         env::var("SCHOOL_BASE_URL").unwrap(),
         course_id
     );
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
-            .parse()
-            .unwrap(),
-    );
-    let resp = reqwest::Client::new()
-        .get(api_path.as_str())
-        .headers(headers)
-        .send()
-        .await?;
+    let course_assignments: Result<Vec<data::Assignment>, &'static str> =
+        call_canvas_api(&api_path);
 
-    let course_assignments = resp.json::<Vec<data::Assignment>>().await?;
+    let ca: Vec<data::Assignment>;
+    match course_assignments {
+        Ok(resp) => ca = resp,
+        Err(_) => return Err("Error getting assignments"),
+    }
+
     let mut valid_assignments: Vec<data::ValidAssignment> = Vec::new();
 
-    valid_assignments.extend(course_assignments.iter().filter_map(|assignment| {
+    valid_assignments.extend(ca.iter().filter_map(|assignment| {
         assignment.due_at.as_ref().and_then(|due_date| {
             let new_date = DateTime::parse_from_rfc3339(due_date)
                 .unwrap()
@@ -272,6 +298,9 @@ pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::
         })
     }));
 
+    Ok(valid_assignments)
+}
+fn print_assignments(assignments: Vec<data::ValidAssignment>) {
     println!(
         "{0: <40} {1: <20} {2: <10}",
         "Assignment Name".blue(),
@@ -279,7 +308,7 @@ pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::
         "Assignment ID".blue()
     );
 
-    for assignment in valid_assignments.iter() {
+    for assignment in assignments.iter() {
         println!(
             "{0: <40} {1: <20} {2: <10}",
             assignment.name,
@@ -287,7 +316,6 @@ pub async fn get_assignments(course_id: &i64) -> Result<(), Box<dyn std::error::
             assignment.id.to_string().green()
         );
     }
-    Ok(())
 }
 /*
 function: canva add [<file_path>] -> can be multiple files
@@ -301,8 +329,7 @@ Return: Result<(UploadData), Box<dyn Error>>
 These are the endpoints that will be used for this function
 https://sit.instructure.com/api/v1/users/self/files
  */
-#[tokio::main]
-pub async fn add_file(file_path: &String) -> Result<data::UploadData, Box<dyn std::error::Error>> {
+fn add_file(file_path: &String) -> Result<data::UploadData, Box<dyn std::error::Error>> {
     let full_file_path = canonicalize(file_path).unwrap();
     let split_path: Vec<&str> = full_file_path.to_str().unwrap().split("/").collect();
     let parent_path = &split_path[0..split_path.len() - 1].join("/");
@@ -312,34 +339,17 @@ pub async fn add_file(file_path: &String) -> Result<data::UploadData, Box<dyn st
         "{}/api/v1/users/self/files",
         env::var("SCHOOL_BASE_URL").unwrap(),
     );
-    let mut headers = HeaderMap::new();
+    // let mut headers = HeaderMap::new();
 
     let form: reqwest::multipart::Form = multipart::Form::new()
         .text("size", file_size.to_string())
         .text("parent_folder_path", parent_path.clone())
         .text("file", file_name.to_string());
 
-    headers.insert(
-        AUTHORIZATION,
-        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
-            .parse()
-            .unwrap(),
-    );
+    let file_upload_data: Result<data::FileUpload, &'static str> = post_data_api(&api_path, form);
 
-    let resp = reqwest::Client::new()
-        .post(api_path.as_str())
-        .headers(headers)
-        .multipart(form)
-        .send()
-        .await?;
-
-    let file_upload_data = resp.json::<data::FileUpload>().await?;
-    // let file_upload_json = serde_json::to_string(&file_upload_data)
-    //     .unwrap()
-    //     .replace("\"", "");
-    // file_upload_json = file_upload_json[1..file_upload_json.len() - 1].to_string();
     let upload_json = data::UploadData::new(
-        file_upload_data,
+        file_upload_data.unwrap(),
         file_name.to_string(),
         parent_path.to_string(),
     );
@@ -348,7 +358,7 @@ pub async fn add_file(file_path: &String) -> Result<data::UploadData, Box<dyn st
         &upload_json,
     )?;
 
-    println!("{:?}", upload_json);
+    // println!("{:?}", upload_json);
 
     Ok(upload_json)
 }

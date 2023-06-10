@@ -40,15 +40,10 @@ impl ValidAssignment {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Assignments {
-    pub assignments: Vec<Assignment>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct Account {
-    id: i64,
-    name: String,
-    created_at: String,
+    pub id: i64,
+    pub name: String,
+    pub created_at: String,
     sortable_name: String,
     short_name: String,
     avatar_url: String,
@@ -265,24 +260,24 @@ pub struct UploadParams {
     pub content_type: Option<String>,
 }
 
-impl FileUpload {
-    pub fn new(
-        file_param: String,
-        upload_url: String,
-        filename: String,
-        content_type: String,
-    ) -> FileUpload {
-        FileUpload {
-            file_param: Some(file_param),
-            progress: None,
-            upload_url: Some(upload_url),
-            upload_params: Some(UploadParams {
-                filename: Some(filename),
-                content_type: Some(content_type),
-            }),
-        }
-    }
-}
+// impl FileUpload {
+//     pub fn new(
+//         file_param: String,
+//         upload_url: String,
+//         filename: String,
+//         content_type: String,
+//     ) -> FileUpload {
+//         FileUpload {
+//             file_param: Some(file_param),
+//             progress: None,
+//             upload_url: Some(upload_url),
+//             upload_params: Some(UploadParams {
+//                 filename: Some(filename),
+//                 content_type: Some(content_type),
+//             }),
+//         }
+//     }
+// }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommitData {
