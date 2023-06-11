@@ -369,8 +369,7 @@ Description: This function will commit the file to canvas
 Paramters: None
 return: Result<(CommitData), Box<dyn Error>>
 */
-#[tokio::main]
-pub async fn commit_file() -> Result<data::CommitData, Box<dyn std::error::Error>> {
+fn commit_file() -> Result<data::CommitData, Box<dyn std::error::Error>> {
     let file = File::open("src/secrets/.upload_data.json").expect("File could not be read");
     let file_upload_data: UploadData = serde_json::from_reader(file).expect("Error reading file");
 
@@ -387,27 +386,13 @@ pub async fn commit_file() -> Result<data::CommitData, Box<dyn std::error::Error
         )
         .text("file", file_upload_data.file_name);
 
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
-            .parse()
-            .unwrap(),
-    );
-
-    let resp = reqwest::Client::new()
-        .post(file_upload_data.file_data.upload_url.unwrap().as_str())
-        .headers(headers)
-        .multipart(form)
-        .send()
-        .await?;
-
-    let commit_data = resp.json::<data::CommitData>().await?;
+    let commit_data: Result<data::CommitData, &'static str> =
+        post_data_api(&file_upload_data.file_data.upload_url.unwrap(), form);
     serde_json::to_writer(
         &File::create("src/secrets/.commit_data.json")?,
         &commit_data,
     )?;
-    Ok(commit_data)
+    Ok(commit_data.unwrap())
 }
 /*
 function: canva submit <course_id> <assignment_id>
@@ -416,7 +401,7 @@ Parameters: course_id, assignment_id
 Return: Result<(SubmissionData), Box<dyn Error>>
 */
 #[tokio::main]
-pub async fn submit_file(
+async fn submit_file(
     course_id: &i64,
     assignment_id: &i64,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -485,7 +470,7 @@ Parameters: auth_token
 Return: Result<(), Box<dyn Error>>
  */
 #[tokio::main]
-pub async fn login() -> Result<(), Box<dyn std::error::Error>> {
+async fn login() -> Result<(), Box<dyn std::error::Error>> {
     // Get environment path where auth and school url will be stored
 
     let mut school_url = String::new();
