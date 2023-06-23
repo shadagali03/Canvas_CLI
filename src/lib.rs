@@ -45,7 +45,8 @@ pub struct Config {
 impl Config {
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
         if args.len() < 2 {
-            return Err("not enough arguments");
+            println!("{}", help::help_message());
+            return Err("Invalid Number of Arguments");
         }
         Ok(Config {
             command: Some(args[1].clone()), // Gets the first input which should be the command
@@ -79,12 +80,15 @@ pub fn run(config: Config) -> Result<(), &'static str> {
             // Handle: canva assignments <course_id>
             "assignments" => {
                 if config.arguments.len() == 1 {
-                    print_assignments(
+                    if let Ok(assignments) =
                         fetch_assignments(&config.arguments[0].parse::<i64>().unwrap())
-                            .expect("Error getting assignments"),
-                    );
+                    {
+                        print_assignments(assignments);
+                    } else {
+                        return Err("Error: Invalid Course ID");
+                    }
                 } else {
-                    return Err("Must provide a course id");
+                    return Err("Too many arguments");
                 }
             }
 
@@ -127,7 +131,12 @@ pub fn run(config: Config) -> Result<(), &'static str> {
 
             // Handle: canva help
             "help" => println!("{}", help::help_message()),
-            _ => println!("{}", "Command not found".red()),
+            _ => println!(
+                "{} {} {}",
+                "Command not found: ".red(),
+                command,
+                help::help_message()
+            ),
         },
         None => println!("{}", "Must Enter A Command!".red()),
     }
@@ -221,7 +230,7 @@ fn fetch_assignments(course_id: &i64) -> Result<Vec<data::ValidAssignment>, &'st
     let ca: Vec<data::Assignment>;
     match course_assignments {
         Ok(resp) => ca = resp,
-        Err(_) => return Err("Error getting assignments"),
+        Err(_) => return Err("Invalid Assignment ID"),
     }
 
     let mut valid_assignments: Vec<data::ValidAssignment> = Vec::new();
@@ -337,6 +346,7 @@ fn commit_file() -> Result<data::CommitData, Box<dyn std::error::Error>> {
     )?;
     Ok(commit_data.unwrap())
 }
+
 /*
 function: canva submit <course_id> <assignment_id>
 Description: This function will submit the file to canvas
@@ -385,6 +395,7 @@ async fn submit_file(
     }
     Ok(())
 }
+
 // Helper function for login to write the user info to the .env file
 fn write_to_env(auth_token: &String, school_url: &String) {
     let path = std::path::Path::new(".env");

@@ -12,6 +12,11 @@ These are the command Canva commands in various situations:
  */
 pub fn help_message() -> String {
     let message = "
+
+Welcome to Canva CLI! This is an application that allows you to interact with your Canvas account from the command line.
+
+Usage: canvas[EXE] [COMMAND] [OPTIONS]
+
 These are the command Canva commands in various situations:
 Managing your account
     account                         Get account information
