@@ -176,7 +176,10 @@ Parameters: auth_token -> but not actually required by user
 Return: Result<(), Box<dyn Error>>
  */
 fn fetch_courses() -> Result<Vec<data::ValidCourse>, &'static str> {
-    let api_path = format!("{}/api/v1/courses", env::var("SCHOOL_BASE_URL").unwrap());
+    let api_path = format!(
+        "{}/api/v1/courses?per_page=100",
+        env::var("SCHOOL_BASE_URL").unwrap()
+    );
     let user_courses: Result<Vec<data::Course>, &'static str> =
         api_calls::call_canvas_api(&api_path);
 
@@ -220,7 +223,7 @@ Paramters: course_id
  */
 fn fetch_assignments(course_id: &i64) -> Result<Vec<data::ValidAssignment>, &'static str> {
     let api_path = format!(
-        "{}/api/v1/courses/{}/assignments",
+        "{}/api/v1/courses/{}/assignments?per_page=100",
         env::var("SCHOOL_BASE_URL").unwrap(),
         course_id
     );
