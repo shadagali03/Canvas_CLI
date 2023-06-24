@@ -20,8 +20,11 @@ where
     match resp {
         Ok(resp) => {
             if resp.status().is_success() {
-                let account_info = resp.json::<T>().await.unwrap();
-                return Ok(account_info);
+                if let Ok(account_info) = resp.json::<T>().await {
+                    return Ok(account_info);
+                } else {
+                    return Err("Error getting account info");
+                }
             } else {
                 return Err("Error getting account info");
             }

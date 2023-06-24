@@ -2,11 +2,6 @@ use serde::{Deserialize, Serialize};
 
 // Use this site to construct the structs: https://quicktype.io/
 
-// pub enum DataTypes {
-//     Assignment,
-//     Course,
-// }
-
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct ValidCourse {
@@ -156,7 +151,7 @@ pub struct Assignment {
     unpublishable: Option<bool>,
     only_visible_to_overrides: Option<bool>,
     locked_for_user: Option<bool>,
-    lock_info: Option<serde_json::Value>,
+    lock_info: Option<LockInfo>,
     lock_explanation: Option<String>,
     quiz_id: Option<i64>,
     anonymous_submissions: Option<bool>,
