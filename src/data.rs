@@ -260,25 +260,6 @@ pub struct UploadParams {
     pub content_type: Option<String>,
 }
 
-// impl FileUpload {
-//     pub fn new(
-//         file_param: String,
-//         upload_url: String,
-//         filename: String,
-//         content_type: String,
-//     ) -> FileUpload {
-//         FileUpload {
-//             file_param: Some(file_param),
-//             progress: None,
-//             upload_url: Some(upload_url),
-//             upload_params: Some(UploadParams {
-//                 filename: Some(filename),
-//                 content_type: Some(content_type),
-//             }),
-//         }
-//     }
-// }
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommitData {
     location: Option<String>,

@@ -1,4 +1,4 @@
-use canvas_cli::Config;
+use canvas_cli::{run, Config};
 use dotenv::dotenv;
 use std::env;
 use std::process;
@@ -11,7 +11,7 @@ fn main() {
         std::process::exit(1);
     });
 
-    if let Err(e) = canvas_cli::run(configuration) {
+    if let Err(e) = run(configuration) {
         println!("Application error: {}", e);
         process::exit(1);
     }

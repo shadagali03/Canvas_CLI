@@ -45,7 +45,8 @@ pub struct Config {
 impl Config {
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
         if args.len() < 2 {
-            return Err("not enough arguments");
+            println!("{}", help::help_message());
+            return Err("Invalid Number of Arguments");
         }
         Ok(Config {
             command: Some(args[1].clone()), // Gets the first input which should be the command
@@ -79,12 +80,15 @@ pub fn run(config: Config) -> Result<(), &'static str> {
             // Handle: canva assignments <course_id>
             "assignments" => {
                 if config.arguments.len() == 1 {
-                    print_assignments(
+                    if let Ok(assignments) =
                         fetch_assignments(&config.arguments[0].parse::<i64>().unwrap())
-                            .expect("Error getting assignments"),
-                    );
+                    {
+                        print_assignments(assignments);
+                    } else {
+                        return Err("Error: Invalid Course ID");
+                    }
                 } else {
-                    return Err("Must provide a course id");
+                    return Err("Too many arguments");
                 }
             }
 
@@ -127,73 +131,18 @@ pub fn run(config: Config) -> Result<(), &'static str> {
 
             // Handle: canva help
             "help" => println!("{}", help::help_message()),
-            _ => println!("{}", "Command not found".red()),
+            _ => println!(
+                "{} {} {}",
+                "Command not found: ".red(),
+                command,
+                help::help_message()
+            ),
         },
         None => println!("{}", "Must Enter A Command!".red()),
     }
     Ok(())
 }
 
-#[tokio::main]
-async fn call_canvas_api<T>(path: &String) -> Result<T, &'static str>
-where
-    T: serde::de::DeserializeOwned,
-{
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
-            .parse()
-            .unwrap(),
-    );
-    let resp = reqwest::Client::new()
-        .get(path.as_str())
-        .headers(headers)
-        .send()
-        .await;
-    match resp {
-        Ok(resp) => {
-            if resp.status().is_success() {
-                let account_info = resp.json::<T>().await.unwrap();
-                return Ok(account_info);
-            } else {
-                return Err("Error getting account info");
-            }
-        }
-        Err(_) => return Err("Error getting account info"),
-    }
-}
-
-#[tokio::main]
-async fn post_data_api<T>(path: &String, form: reqwest::multipart::Form) -> Result<T, &'static str>
-where
-    T: serde::de::DeserializeOwned,
-{
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        format!("Bearer {}", env::var("CANVAS_AUTH_TOKEN").unwrap())
-            .parse()
-            .unwrap(),
-    );
-    let resp = reqwest::Client::new()
-        .post(path.as_str())
-        .headers(headers)
-        .multipart(form)
-        .send()
-        .await;
-    match resp {
-        Ok(resp) => {
-            if resp.status().is_success() {
-                let account_info = resp.json::<T>().await.unwrap();
-                return Ok(account_info);
-            } else {
-                return Err("Error getting account info");
-            }
-        }
-        Err(_) => return Err("Error getting account info"),
-    }
-}
 /*
 function: account
 Description: This function will allow the user to login to their canvas account
@@ -203,7 +152,8 @@ Return: Result<(), Box<dyn Error>>
 fn fetch_account_info() -> Result<data::Account, &'static str> {
     // Will abstract this later to just be an api call that takes three params (api_path, data structure that JSON will be mapped to))
     let api_path = format!("{}/api/v1/users/self", env::var("SCHOOL_BASE_URL").unwrap());
-    let user_account_information: Result<data::Account, &'static str> = call_canvas_api(&api_path);
+    let user_account_information: Result<data::Account, &'static str> =
+        api_calls::call_canvas_api(&api_path);
 
     match user_account_information {
         Ok(resp) => Ok(resp),
@@ -227,7 +177,8 @@ Return: Result<(), Box<dyn Error>>
  */
 fn fetch_courses() -> Result<Vec<data::ValidCourse>, &'static str> {
     let api_path = format!("{}/api/v1/courses", env::var("SCHOOL_BASE_URL").unwrap());
-    let user_courses: Result<Vec<data::Course>, &'static str> = call_canvas_api(&api_path);
+    let user_courses: Result<Vec<data::Course>, &'static str> =
+        api_calls::call_canvas_api(&api_path);
 
     let mut valid_courses: Vec<data::ValidCourse> = Vec::new();
 
@@ -274,12 +225,12 @@ fn fetch_assignments(course_id: &i64) -> Result<Vec<data::ValidAssignment>, &'st
         course_id
     );
     let course_assignments: Result<Vec<data::Assignment>, &'static str> =
-        call_canvas_api(&api_path);
+        api_calls::call_canvas_api(&api_path);
 
     let ca: Vec<data::Assignment>;
     match course_assignments {
         Ok(resp) => ca = resp,
-        Err(_) => return Err("Error getting assignments"),
+        Err(_) => return Err("Invalid Assignment ID"),
     }
 
     let mut valid_assignments: Vec<data::ValidAssignment> = Vec::new();
@@ -346,7 +297,8 @@ fn add_file(file_path: &String) -> Result<data::UploadData, Box<dyn std::error::
         .text("parent_folder_path", parent_path.clone())
         .text("file", file_name.to_string());
 
-    let file_upload_data: Result<data::FileUpload, &'static str> = post_data_api(&api_path, form);
+    let file_upload_data: Result<data::FileUpload, &'static str> =
+        api_calls::post_data_api(&api_path, form);
 
     let upload_json = data::UploadData::new(
         file_upload_data.unwrap(),
@@ -387,13 +339,14 @@ fn commit_file() -> Result<data::CommitData, Box<dyn std::error::Error>> {
         .text("file", file_upload_data.file_name);
 
     let commit_data: Result<data::CommitData, &'static str> =
-        post_data_api(&file_upload_data.file_data.upload_url.unwrap(), form);
+        api_calls::post_data_api(&file_upload_data.file_data.upload_url.unwrap(), form);
     serde_json::to_writer(
         &File::create("src/secrets/.commit_data.json")?,
         &commit_data,
     )?;
     Ok(commit_data.unwrap())
 }
+
 /*
 function: canva submit <course_id> <assignment_id>
 Description: This function will submit the file to canvas
@@ -442,6 +395,7 @@ async fn submit_file(
     }
     Ok(())
 }
+
 // Helper function for login to write the user info to the .env file
 fn write_to_env(auth_token: &String, school_url: &String) {
     let path = std::path::Path::new(".env");
